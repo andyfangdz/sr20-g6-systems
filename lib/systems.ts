@@ -18,7 +18,7 @@ export const SYS: SysDef[] = [
   { id: "propeller", name: "Propeller", pg: "7-38", key: "oil", cam: [[6.6, 1.0, -3.2], [3.5, -0.14, 0]], blurb: "Single-lever governor logic" },
   { id: "fuel", name: "Fuel", pg: "7-39", key: "fuel", cam: [[2.6, 7, 8], [1.0, -0.5, 0]], blurb: "Wet wings, selector, boost pump" },
   { id: "electrical", name: "Electrical", pg: "7-46", key: "elec", cam: [[4.6, 3.0, 4.9], [1.6, -0.1, 0]], blurb: "2 alts, 2 batteries, 10 buses" },
-  { id: "lighting", name: "Lighting", pg: "7-56", key: "elec", cam: [[-4.5, 3.4, 8.5], [0.6, 0, 0]], blurb: "Panel, cabin and convenience lights" },
+  { id: "lighting", name: "Lighting", pg: "7-56", key: "elec", cam: [[-4.5, 3.4, 8.5], [0.6, 0, 0]], blurb: "Wingtip, landing, ice and cabin lights" },
   { id: "environment", name: "Environmental", pg: "7-59", key: "air", cam: [[4.4, 1.8, 3.8], [2.0, -0.2, 0]], blurb: "Heat, fresh air, optional A/C" },
   { id: "pitot", name: "Pitot-static & stall", pg: "7-66", key: "pitot", cam: [[3.8, 2.8, -8], [0.4, -0.3, -0.6]], blurb: "Heated pitot, static, stall horn" },
   { id: "avionics", name: "Avionics", pg: "7-70", key: "avx", cam: [[0.55, 0.35, 0.42], [2.28, 0.06, -0.02]], blurb: "Displays, ADAHRS, GIAs, CAS" },

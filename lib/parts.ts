@@ -6,7 +6,7 @@
 import * as THREE from "three";
 import {
   AB, EF, FIN, FW, HF, HH, HR, HZ, SSPAN, SY, WR, af, box, botY, cyl, fC, fLE, finCut, finHs, finSec, fus, fuselageGeo, hingeX,
-  loft, pantGeo, planeRing, sC, sLE, sectionSlab, sph, stabSec, topY, tubeGeo, wC, wLE, wT, wY, wingP, wingSec, fRing,
+  loft, onSkin, pantGeo, planeRing, sC, sLE, sectionSlab, sph, stabSec, topY, tubeGeo, wC, wLE, wT, wY, wingP, wingSec, fRing,
 } from "./geometry";
 import { V, type Vec3 } from "./math";
 import { AIL_DRIVE, AIL_SECTOR, CARR, ELEV_HORN, ETT, LEVER_ANG, PEDAL_TT, PULLEYS, RUD_HORN, RUD_HORN_AFT, alongCable, pulleyGeo, sectorGeo } from "./rig";
@@ -324,8 +324,17 @@ part(() => tubeGeo([[-0.62, 0.24, 0], [AB, 0.2, 0]], 0.014), ["caps"], { name: "
 
 /* ---------- lights ---------- */
 const tipAt = (s: number): Vec3 => [wLE(5.84) - 0.5 * wC(5.84), wY(5.84), s * 5.85];
+const iceAt = (s: number) => onSkin(2.02, -0.34, s);
 export const LIGHTS = {
-  tipL: tipAt(-1), tipR: tipAt(1), tail: [-3.38, -0.11, 0] as Vec3,
+  // wingtip assemblies: forward nav + strobe, aft-facing white position light, leading-edge landing/recognition light
+  tipL: tipAt(-1), tipR: tipAt(1),
+  aftL: P(wingP(-5.8, 0.93, 0).add(V(-0.02, 0, -0.01))), aftR: P(wingP(5.8, 0.93, 0).add(V(-0.02, 0, 0.01))),
+  recL: P(wingP(-5.5, 0, 0).add(V(0.01, 0, 0))), recR: P(wingP(5.5, 0, 0).add(V(0.01, 0, 0))),
+  /** Lower-cowl landing light, under the spinner. */
+  land: [3.7, -0.34, 0] as Vec3,
+  /** Ice inspection lights on the fuselage sides, aimed at each wing leading edge. */
+  iceL: P(iceAt(-1)), iceR: P(iceAt(1)),
+  iceAimL: P(wingP(-2.4, 0.02, 1)), iceAimR: P(wingP(2.4, 0.02, 1)),
   dome: [1.2, 0.64, 0] as Vec3,
   foot: [[2.2, -0.55, -0.35], [2.2, -0.55, 0.35], [0.8, -0.56, -0.35], [0.8, -0.56, 0.35]] as Vec3[],
   step: [[1.55, -0.74, -0.52], [1.55, -0.74, 0.52]] as Vec3[],
@@ -333,9 +342,16 @@ export const LIGHTS = {
 };
 ([["Dome light", LIGHTS.dome, false], ["Footwell light", LIGHTS.foot[0], false], ["Entry step light", LIGHTS.step[0], true], ["Baggage light", LIGHTS.bag, false]] as [string, Vec3, boolean][]).forEach(([name, pos, ext]) =>
   part(() => sph(0.022), ["lighting"], { pos, color: "#E8C46A", name, note: "Convenience lighting, 5 A CONV LIGHTS breaker on the CONV bus (BAT 1 direct).", pin: true, ext }));
-([[LIGHTS.tipL, "Left nav/strobe (red)"], [LIGHTS.tipR, "Right nav/strobe (green)"], [LIGHTS.tail, "Tail position light"]] as [Vec3, string][]).forEach(([pos, name]) =>
-  part(() => sph(0.035), ["lighting"], { pos, color: "#D9D9D9", name, note: "Exterior lighting is described in the Spectra wing tip light supplement (11934-S56). NAV and STROBE breakers on NON ESS BUS.", pin: true, ext: true }));
-
+const EXT = "#D9D9D9";
+([[LIGHTS.tipL, "Left wingtip: nav (red) + strobe"], [LIGHTS.tipR, "Right wingtip: nav (green) + strobe"]] as [Vec3, string][]).forEach(([pos, name]) =>
+  part(() => sph(0.035), ["lighting"], { pos, color: EXT, name, note: "LED position light and anti-collision strobe in one wingtip assembly. NAV and STROBE switches on the bolster; breakers on NON ESS BUS.", pin: true, ext: true }));
+[LIGHTS.aftL, LIGHTS.aftR].forEach((pos, i) =>
+  part(() => sph(0.025), ["lighting"], { pos, color: EXT, name: "Aft position light (white)", note: "White rear-facing position light in the wingtip trailing edge, on the NAV switch. It does the tail light's job: there is no light on the rudder or tailcone.", pin: i === 0, ext: true }));
+[LIGHTS.recL, LIGHTS.recR].forEach((pos, i) =>
+  part(() => box(0.03, 0.035, 0.14), ["lighting"], { pos, color: EXT, name: "Wingtip landing / recognition light", note: "LED lamp behind the clear lens in the wingtip leading edge. Comes on with the landing light (LAND switch) to make the airplane easier to see head-on.", pin: i === 1, ext: true }));
+part(() => box(0.03, 0.06, 0.12), ["lighting"], { pos: LIGHTS.land, color: EXT, name: "Landing light (lower cowl)", note: "LED landing light in the lower cowl, below the spinner. LAND switch on the bolster; breaker on NON ESS BUS in this model.", pin: true, ext: true });
+[LIGHTS.iceL, LIGHTS.iceR].forEach((pos, i) =>
+  part(() => cyl(0.022, 0.02, "z"), ["lighting"], { pos, color: EXT, name: "Ice inspection light", note: "Fuselage-side light aimed at the wing leading edge so you can check for ice at night. ICE switch on the bolster. Position on the model is approximate.", pin: i === 1, ext: true }));
 
 /* ---------- flight-control mechanisms (POH Figures 7-1, 7-2, 7-3) ---------- */
 const CTL = "#7C57CF", STEEL = "#8C959C";

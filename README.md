@@ -25,6 +25,7 @@ npm run typecheck
 | Engine & propeller | Ignition key (magneto → plug mapping), power lever (governor schedule), mixture, alternate air |
 | Fuel | Selector, boost pump, tank quantities (clipped fuel level), starvation |
 | Electrical | Master switches, failures, battery endurance, **pullable circuit breakers**, G6 CAS names |
+| Lighting | NAV / STROBE / LAND / ICE switches: wingtip nav, strobe, aft position and recognition lights (no tail light), lower-cowl landing light, ice inspection lights; cabin and convenience lights |
 | Environmental | OFF–0–1–2–3 fan knob, temperature blend, vent modes, A/C, recirculation |
 | Pitot-static & stall | Pitot heat logic and annunciations, stall-warning suction peak and horn |
 | Avionics | Live PFD / MFD / standby textures that go dark with their buses; display backup |

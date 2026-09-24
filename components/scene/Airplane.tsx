@@ -9,7 +9,7 @@ import { D2R, V } from "@/lib/math";
 import {
   CYLS, LIGHTS, NOSE_CASTER, NOSE_GEAR, PROP, SHELLS, SURFACES, YOKES, YOKE_X, YOKE_Y, partsFor, type SurfaceSpec,
 } from "@/lib/parts";
-import { bladeAngle, cabinLit, live } from "@/lib/sim/model";
+import { bladeAngle, cabinLit, extLit, live } from "@/lib/sim/model";
 import { useSim } from "@/lib/sim/store";
 import { palette, sysColor } from "@/lib/systems";
 import { ControlRig } from "./ControlRig";
@@ -165,28 +165,56 @@ function Displays() {
 }
 
 /* ---------- exterior + cabin light glows ---------- */
+/** Faint additive cone from `from` (narrow) to `to` (wide), for landing and ice-light beams. */
+function beamProps(from: THREE.Vector3Tuple, to: THREE.Vector3Tuple, r: number) {
+  const a = V(...from), b = V(...to), d = b.clone().sub(a), len = d.length();
+  const geo = new THREE.CylinderGeometry(r, 0.015, len, 24, 1, true);
+  const quat = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), d.normalize());
+  return { geo, pos: a.clone().add(b).multiplyScalar(0.5), quat };
+}
+const LAND_AIM: THREE.Vector3Tuple = [6.6, -0.95, 0];
+
 function LightFX() {
-  const refs = useRef<Record<string, THREE.Sprite | null>>({});
+  const refs = useRef<Record<string, THREE.Object3D | null>>({});
+  const set = (key: string) => (o: THREE.Object3D | null) => { refs.current[key] = o; };
   const glow = (key: string, pos: THREE.Vector3Tuple, color: string, size: number) => (
-    <sprite key={key} ref={(s) => { refs.current[key] = s; }} position={pos} scale={[size, size, size]} raycast={() => null}>
+    <sprite key={key} ref={set(key)} position={pos} scale={[size, size, size]} raycast={() => null}>
       <spriteMaterial map={dotTex()} color={color} transparent depthWrite={false} blending={THREE.AdditiveBlending} />
     </sprite>
   );
+  const beams = useMemo(() => ({
+    land: beamProps(LIGHTS.land, LAND_AIM, 0.55),
+    iceL: beamProps(LIGHTS.iceL, LIGHTS.iceAimL, 0.16),
+    iceR: beamProps(LIGHTS.iceR, LIGHTS.iceAimR, 0.16),
+  }), []);
+  const beam = (key: keyof typeof beams, opacity: number) => (
+    <mesh key={key + "Beam"} ref={set(key + "Beam")} geometry={beams[key].geo} position={beams[key].pos} quaternion={beams[key].quat} raycast={() => null}>
+      <meshBasicMaterial color="#FFF6DD" transparent opacity={opacity} depthWrite={false} blending={THREE.AdditiveBlending} />
+    </mesh>
+  );
   useFrame(({ clock }) => {
     const { s, E } = useSim.getState(), R = refs.current;
-    const ext = s.sys === "overview" || s.sys === "lighting", strobe = clock.elapsedTime % 1.2 < 0.06;
-    ["navL", "navR", "navT"].forEach((k) => R[k] && (R[k]!.visible = ext && E.navPwr));
-    ["strL", "strR"].forEach((k) => R[k] && (R[k]!.visible = ext && E.strobePwr && strobe));
+    const show = (keys: string[], on: boolean) => keys.forEach((k) => R[k] && (R[k]!.visible = on));
+    const ext = s.sys === "overview" || s.sys === "lighting", x = extLit(s, E), strobe = clock.elapsedTime % 1.2 < 0.06;
+    show(["navL", "navR", "aftL", "aftR"], ext && x.nav);
+    show(["strL", "strR"], ext && x.strobe && strobe);
+    show(["land", "landBeam", "recL", "recR"], ext && x.land);
+    show(["iceL", "iceR", "iceLBeam", "iceRBeam"], ext && x.ice);
     const cl = cabinLit(s, E), cab = s.sys === "lighting";
-    if (R.dome) R.dome.visible = cab && cl.dome;
-    if (R.bag) R.bag.visible = cab && cl.bag;
-    LIGHTS.foot.forEach((_, i) => R["foot" + i] && (R["foot" + i]!.visible = cab && cl.foot));
-    LIGHTS.step.forEach((_, i) => R["step" + i] && (R["step" + i]!.visible = cab && cl.step));
+    show(["dome"], cab && cl.dome);
+    show(["bag"], cab && cl.bag);
+    show(LIGHTS.foot.map((_, i) => "foot" + i), cab && cl.foot);
+    show(LIGHTS.step.map((_, i) => "step" + i), cab && cl.step);
   });
   return (
     <>
-      {glow("navL", LIGHTS.tipL, "#FF2A2A", 0.3)}{glow("navR", LIGHTS.tipR, "#22FF66", 0.3)}{glow("navT", LIGHTS.tail, "#FFFFFF", 0.25)}
+      {glow("navL", LIGHTS.tipL, "#FF2A2A", 0.3)}{glow("navR", LIGHTS.tipR, "#22FF66", 0.3)}
+      {glow("aftL", LIGHTS.aftL, "#FFFFFF", 0.22)}{glow("aftR", LIGHTS.aftR, "#FFFFFF", 0.22)}
       {glow("strL", LIGHTS.tipL, "#FFFFFF", 0.8)}{glow("strR", LIGHTS.tipR, "#FFFFFF", 0.8)}
+      {glow("land", LIGHTS.land, "#FFF6DD", 0.5)}{beam("land", 0.1)}
+      {glow("recL", LIGHTS.recL, "#FFF6DD", 0.4)}{glow("recR", LIGHTS.recR, "#FFF6DD", 0.4)}
+      {glow("iceL", LIGHTS.iceL, "#FFF6DD", 0.25)}{glow("iceR", LIGHTS.iceR, "#FFF6DD", 0.25)}
+      {beam("iceL", 0.12)}{beam("iceR", 0.12)}
       {glow("dome", LIGHTS.dome, "#FFE7B0", 0.6)}{glow("bag", LIGHTS.bag, "#FFE7B0", 0.5)}
       {LIGHTS.foot.map((p, i) => glow("foot" + i, p, "#FFE7B0", 0.35))}
       {LIGHTS.step.map((p, i) => glow("step" + i, p, "#FFE7B0", 0.4))}
