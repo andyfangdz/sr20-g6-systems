@@ -30,7 +30,8 @@ export interface Sim {
   env: { fan: number; temp: number; vent: Vent; ac: boolean; recirc: boolean };
   pitot: { heat: boolean; oat: number; heaterFail: boolean; alt: boolean };
   stall: { aoa: number; fault: boolean };
-  lights: { cabin: CabinSwitch; door: boolean; unlocked: boolean; bag: boolean };
+  /** Cabin switch + door state, and the bolster exterior light switches. */
+  lights: { cabin: CabinSwitch; door: boolean; unlocked: boolean; bag: boolean; nav: boolean; strobe: boolean; land: boolean; ice: boolean };
   avx: { backup: boolean; pfdFail: boolean };
   /** CAPS deployment active (time itself lives in `live`). */
   capsOn: boolean;
@@ -48,7 +49,7 @@ export const initialSim: Sim = {
   env: { fan: 1, temp: 0.35, vent: "PF", ac: false, recirc: false },
   pitot: { heat: true, oat: 8, heaterFail: false, alt: false },
   stall: { aoa: 6, fault: false },
-  lights: { cabin: "AUTO", door: false, unlocked: false, bag: false },
+  lights: { cabin: "AUTO", door: false, unlocked: false, bag: false, nav: true, strobe: true, land: false, ice: false },
   avx: { backup: false, pfdFail: false },
   capsOn: false,
 };
@@ -72,7 +73,7 @@ export interface Elec extends Record<BusId, number> {
   a1: number; a2: number; b1: number;
   pfd: boolean; mfd: boolean; stby: boolean;
   flapsPwr: boolean; pitotPwr: boolean; stallPwr: boolean; boostPwr: boolean; starterPwr: boolean;
-  pitchTrim: boolean; rollTrim: boolean; navPwr: boolean; strobePwr: boolean; eisPwr: boolean; convPwr: boolean;
+  pitchTrim: boolean; rollTrim: boolean; navPwr: boolean; strobePwr: boolean; landPwr: boolean; icePwr: boolean; eisPwr: boolean; convPwr: boolean;
 }
 
 /**
@@ -120,7 +121,8 @@ export function solveElec(s: Sim): Elec {
     flapsPwr: pw("nonEss", "FLAPS"), pitotPwr: pw("nonEss", "PITOT HEAT"), stallPwr: pw("ess2", "STALL WARNING"),
     boostPwr: pw("main2", "FUEL PUMP"), starterPwr: pw("nonEss", "STARTER") && bat1ok,
     pitchTrim: pw("ess2", "PITCH TRIM"), rollTrim: pw("ess2", "ROLL TRIM"),
-    navPwr: pw("nonEss", "NAV LIGHTS"), strobePwr: pw("nonEss", "STROBE LIGHTS"), eisPwr: pw("ess2", "ENGINE INSTR"),
+    navPwr: pw("nonEss", "NAV LIGHTS"), strobePwr: pw("nonEss", "STROBE LIGHTS"),
+    landPwr: pw("nonEss", "LANDING LIGHT"), icePwr: pw("nonEss", "ICE INSP LIGHTS"), eisPwr: pw("ess2", "ENGINE INSTR"),
     convPwr: buses.conv > 0 && cb("CONV LIGHTS"),
   };
 }
@@ -135,6 +137,12 @@ export function cabinLit(s: Sim, E: Elec) {
   const trig = L.door || L.unlocked;
   if (L.cabin === "ON") return { dome: true, foot: true, step: trig, bag: L.bag };
   return { dome: trig, foot: trig, step: trig, bag: L.bag };
+}
+
+/** Exterior lights actually lit: bolster switch AND breaker/bus power. */
+export function extLit(s: Sim, E: Elec) {
+  const L = s.lights;
+  return { nav: L.nav && E.navPwr, strobe: L.strobe && E.strobePwr, land: L.land && E.landPwr, ice: L.ice && E.icePwr };
 }
 
 export type CasLevel = "w" | "c" | "a";
@@ -166,7 +174,7 @@ export const BUSES: [BusId, string, string, [string, number?][]][] = [
   ["ess2", "ESS BUS 2", "Ess Dist Bus + BAT 2", [["PITCH TRIM", 2], ["ROLL TRIM", 2], ["STALL WARNING", 2], ["ENGINE INSTR", 3], ["ALT 2", 5]]],
   ["main1", "MAIN BUS 1", "Main Dist Bus 2", [["MFD B", 5], ["STDBY ATTD B", 5], ["KEYPADS / AP CTRL", 5], ["CABIN LIGHTS", 5], ["CABIN AIR CONTROL", 2], ["FUEL QTY", 5], ["AP SERVOS"], ["AVIONICS", 10]]],
   ["main2", "MAIN BUS 2", "Main Dist Bus 2", [["PFD B", 5], ["FUEL PUMP", 5], ["COM 2", 7.5], ["GPS NAV GIA 2", 5], ["ADAHRS 2", 5], ["AVIONICS FAN 2", 5]]],
-  ["nonEss", "NON ESS BUS", "Main Dist Bus 2", [["FLAPS", 10], ["PITOT HEAT", 7.5], ["STARTER", 2], ["AVIONICS FAN 1", 5], ["NAV LIGHTS"], ["STROBE LIGHTS"]]],
+  ["nonEss", "NON ESS BUS", "Main Dist Bus 2", [["FLAPS", 10], ["PITOT HEAT", 7.5], ["STARTER", 2], ["AVIONICS FAN 1", 5], ["NAV LIGHTS"], ["STROBE LIGHTS"], ["LANDING LIGHT"], ["ICE INSP LIGHTS"]]],
   ["avx", "AVIONICS BUS", "MAIN BUS 1 via AVIONICS switch", [["AUDIO PANEL", 5], ["XPONDER", 2], ["DATA LINK/WX", 5], ["TRAFFIC", 5], ["DME/ADF", 3]]],
   ["main3", "MAIN BUS 3", "Main Dist Bus 1", [["MFD A", 5], ["12V & USB", 5], ["EVS CAMERA", 5]]],
   ["ac1", "A/C BUS 1", "Main Dist Bus 1", [["ALT 1", 5], ["A/C COND", 15]]],
