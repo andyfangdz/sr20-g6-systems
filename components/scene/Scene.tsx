@@ -77,7 +77,7 @@ export default function Scene() {
       aria-label="3D model of the SR20 and its systems"
     >
       <color attach="background" args={[pal.scene]} />
-      {/* legacy (r147) intensities × π for physically-based lighting */}
+      {/* pre-r155 light intensities × π for physically-based lighting */}
       <hemisphereLight args={["#ffffff", "#445566", 0.85 * Math.PI]} />
       <directionalLight position={[6, 10, 5]} intensity={0.9 * Math.PI} />
       <directionalLight position={[-6, 3, -6]} intensity={0.35 * Math.PI} />
