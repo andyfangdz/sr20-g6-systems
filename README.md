@@ -19,7 +19,7 @@ npm run typecheck
 
 | System | Interactive |
 | --- | --- |
-| Flight controls | Yoke pitch/roll and pedals drive the surfaces, cables and yokes; horn balances, trim tabs, static wicks |
+| Flight controls | Cable runs from POH Figs 7-1/7-2/7-3: torque tube, sectors, pulleys, push-pull tubes and bellcranks move with the yokes and pedals; per-channel focus (elevator / aileron / rudder); horn balances, trim tabs, static wicks |
 | Wing flaps | UP / 50% / 100% with position lights and VFE; needs the FLAPS breaker and NON ESS bus |
 | Gear & brakes | Differential braking castering the nose wheel, parking brake |
 | Engine & propeller | Ignition key (magneto → plug mapping), power lever (governor schedule), mixture, alternate air |
@@ -41,6 +41,7 @@ components/
     Airplane.tsx      Airframe shells, control surfaces, moving assemblies, tanks, displays, lights
     Part.tsx          Generic part: emphasis per system, animation hooks, labels, hover picking
     Flows.tsx         Pipes / wires / ducts / cables with moving particles
+    ControlRig.tsx    Animated flight-control linkages (sectors, pulleys, push rods)
     Parachute.tsx     CAPS deployment animation
   panels/             Per-system explanation + controls (React)
   ui/controls.tsx     Seg, Slider, Check, Rocker, Readouts, Facts, …
@@ -48,6 +49,7 @@ lib/
   geometry.ts         Airframe geometry (lofts, airfoils, fuselage profile, windows, painted skin)
   parts.ts            Declarative catalogue of every component
   flows.ts            Flow paths and the rules that drive them
+  rig.ts              Flight-control cable routing and linkage kinematics (POH Figs 7-1 to 7-3)
   displays.ts         Canvas drawing for PFD / MFD / standby
   sim/model.ts        Sim state, electrical solver, CAS logic, bus table (pure functions)
   sim/store.ts        zustand store (discrete state + derived electrical solution)

@@ -1,7 +1,8 @@
 /** Pipes, wires, ducts and cables with moving particles, plus the rules that drive them. */
 import * as THREE from "three";
 import { V, type Vec3 } from "./math";
-import { CYLS, FT, PITOT_Z, SPX, STALL_Z, pitotBase, statR } from "./parts";
+import { CYLS, FT, PITOT_Z, SPX, STALL_Z, chanOfKey, pitotBase, statR } from "./parts";
+import { CABLES } from "./rig";
 import { wingP } from "./geometry";
 import { fuelAvail, live, type Elec, type Sim } from "./sim/model";
 import type { SysId } from "./systems";
@@ -20,6 +21,7 @@ export interface FlowSpec {
   size?: number;
   tension?: number;
   ext?: boolean;
+  chan?: ReturnType<typeof chanOfKey>;
 }
 
 const F: FlowSpec[] = [];
@@ -71,12 +73,8 @@ flow("static", [[SPX, statR.cy, statR.hw - 0.01], [SPX + 0.2, -0.2, 0], [SPX, st
 flow("static2", [[SPX + 0.2, -0.2, 0], [0.9, -0.62, 0], [2.0, -0.55, -0.1], ADAHRS], ["pitot"], { r: 0.009, name: "Static line", note: "To ADAHRS and standby, with water traps at the low points." });
 flow("stall", [wingP(STALL_Z, 0.02, 0), wingP(STALL_Z, 0.3, 0), wingP(0.9, 0.4, 0)], ["pitot"], { r: 0.009, name: "Stall warning line", note: "Inlet → pressure switch." });
 
-// control runs
-const aSec = (s: number) => wingP(s * 4.3, 0.7, 0);
-flow("elev", [[2.02, -0.08, -0.4], [2.1, -0.58, 0], [0, -0.62, 0], [-1.5, -0.25, 0], [-2.2, -0.1, 0], [-2.84, -0.03, 0]], ["controls"], { r: 0.01, tension: 0.05, name: "Elevator cable & push-pull tube", note: "Yoke → forward sector → single cable under the floor → aft sector pulley → push-pull tube → elevator bellcrank." });
-flow("ailL", [[2.1, -0.45, 0], [1.5, -0.62, -0.05], [0.55, -0.62, -0.2], wingP(-1.2, 0.62, 0), aSec(-1)], ["controls"], { r: 0.01, tension: 0.1, name: "Aileron cable (L)", note: "Push rods → central sector → cable aft of rear spar → wing → sector/crank arm → conical drive arm." });
-flow("ailR", [[2.1, -0.45, 0], [1.5, -0.62, 0.05], [0.55, -0.62, 0.2], wingP(1.2, 0.62, 0), aSec(1)], ["controls"], { r: 0.01, tension: 0.1, name: "Aileron cable (R)" });
-flow("rud", [[2.4, -0.6, 0.1], [0, -0.6, 0.1], [-1.6, -0.2, 0.06], [-2.6, 0, 0.03], [-3.08, -0.06, 0]], ["controls"], { r: 0.01, tension: 0.05, name: "Rudder cable", note: "Pedals → single cable under the floor → aft sector → push-pull tube → rudder bellcrank." });
+// control cables — laid out after POH Figures 7-1 / 7-2 / 7-3 (see lib/rig.ts)
+CABLES.forEach((c) => flow(c.key, c.pts, ["controls"], { r: 0.005, size: 0.045, tension: 0.05, name: c.name, note: c.note, count: 18, chan: chanOfKey(c.key) }));
 flow("flapPush", [[FT.x, FT.y, 0], [FT.x, FT.y, 0.9], wingP(1.2, 0.74, 0)], ["flaps"], { tube: false, pcolor: "#B9A3F0" });
 flow("flapPush2", [[FT.x, FT.y, 0], [FT.x, FT.y, -0.9], wingP(-1.2, 0.74, 0)], ["flaps"], { tube: false, pcolor: "#B9A3F0" });
 
@@ -112,7 +110,10 @@ export function flowRates(s: Sim, E: Elec): Record<string, number> {
   R.defrost = R.defrost2 = wind ? air : 0;
   R.pitot = 0.4; R.static = R.static2 = 0.4;
   R.stall = s.stall.aoa >= 14 && !s.stall.fault ? -1 : 0;
-  R.elev = s.ctrl.pitch * 2; R.ailL = s.ctrl.roll * 2; R.ailR = -s.ctrl.roll * 2; R.rud = s.ctrl.yaw * 2;
+  // each cable loop: one strand pays out while the other takes up
+  R.elA = s.ctrl.pitch * 2; R.elB = -s.ctrl.pitch * 2;
+  R.ailR = s.ctrl.roll * 2; R.ailL = -s.ctrl.roll * 2; R.ailBal = -s.ctrl.roll * 2;
+  R.rudR = -s.ctrl.yaw * 2; R.rudL = s.ctrl.yaw * 2;
   const flapMoving = Math.abs(live.flapAng - s.flaps.cmd * 0.32) > 0.2 && E.flapsPwr;
   R.flapPush = R.flapPush2 = flapMoving ? 1 : 0;
   return R;

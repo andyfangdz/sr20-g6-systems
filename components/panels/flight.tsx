@@ -1,27 +1,72 @@
 "use client";
-import { live } from "@/lib/sim/model";
+import { live, type Chan } from "@/lib/sim/model";
+import type { Vec3 } from "@/lib/math";
+import { sysDef } from "@/lib/systems";
 import { useSim } from "@/lib/sim/store";
 import { BtnRow, Caution, Check, Ctl, Facts, H3, Notes, PartsList, Readouts, Seg, Slider, useTicker } from "../ui/controls";
 
 const dir = (v: number, pos: string, neg: string, mid: string, dz = 0.02) => (v > dz ? pos : v < -dz ? neg : mid);
 
+/** Camera framing for each control channel. */
+const CHAN_CAM: Record<Chan, [Vec3, Vec3]> = {
+  elevator: [[-1.6, 2.4, -10.2], [-0.6, -0.35, 0]],
+  aileron: [[-4.2, 10.5, 0.4], [0.4, -0.4, 0]],
+  rudder: [[-1.6, 2.4, 10.2], [-0.6, -0.35, 0]],
+};
+
+const RUNS: Record<Chan, { fig: string; steps: string[] }> = {
+  elevator: { fig: "POH Figure 7-1", steps: [
+    "Pulling a yoke slides its tube aft in a bearing carriage.",
+    "A drop link from each yoke tube rotates a lever on the lateral elevator torque tube under the panel.",
+    "The forward sector on that torque tube drives a crossed cable pair down to the forward double pulley under the floor.",
+    "A single cable loop runs aft under the cabin floor, over the intermediate double pulley and past the turnbuckles, to the aft sector pulley in the tailcone.",
+    "A push-pull tube from the aft sector pulley moves the elevator bellcrank between the two elevator halves.",
+  ] },
+  aileron: { fig: "POH Figure 7-2", steps: [
+    "Turning a yoke rotates it in its pivoting bearing carriage.",
+    "Push rods link both carriages to the centrally located pulley sector.",
+    "Two cables drop to the floor double pulley and run aft under the floor, aft of the rear spar, to the turning pulleys.",
+    "From there one cable runs out each wing to a vertical sector / crank arm, which turns the aileron through a right-angle conical drive arm.",
+    "A balance cable joins the two wing sectors through cable guides, closing the loop — one aileron goes up as the other goes down.",
+  ] },
+  rudder: { fig: "POH Figure 7-3", steps: [
+    "Pushing a pedal swings the pedal links and the rudder cable horn on the pedal torque tube.",
+    "A single cable system runs aft under the floor over the forward and intermediate double pulleys.",
+    "It ends at the aft rudder sector, next to the elevator sector pulley in the aft fuselage.",
+    "A push-pull tube from that sector drives the rudder bellcrank at the bottom of the rudder.",
+    "Springs and a ground-adjustable spring cartridge on the pedal assembly centre the rudder (yaw trim).",
+  ] },
+};
+
 export function Controls() {
-  const s = useSim((x) => x.s), E = useSim((x) => x.E), up = useSim((x) => x.update);
+  const s = useSim((x) => x.s), E = useSim((x) => x.E), up = useSim((x) => x.update), flyTo = useSim((x) => x.flyTo);
+  const focus = (v: Chan | "all") => {
+    up((d) => { d.ctrlFocus = v; });
+    const [p, t] = v === "all" ? sysDef("controls").cam : CHAN_CAM[v];
+    flyTo(p, t);
+  };
   return (
     <>
       <p className="lead">Two single-handed side yokes drive conventional ailerons, elevator and rudder through push rods, cables and bellcranks. Pitch and roll trim move the neutral point of spring cartridges electrically; yaw trim is set on the ground.</p>
       <H3>Try it</H3>
       <Ctl>
+        <Seg id="chan" label="Show cable run" options={[["all", "All"], ["elevator", "Elevator"], ["aileron", "Aileron"], ["rudder", "Rudder"]]} value={s.ctrlFocus} onChange={focus} />
         <Slider id="ctlPitch" label="Yoke pitch (push ↔ pull)" min={-1} max={1} step={0.01} value={s.ctrl.pitch} onChange={(v) => up((d) => { d.ctrl.pitch = v; })} fmt={(v) => dir(v, "Nose up", "Nose down", "Neutral")} />
         <Slider id="ctlRoll" label="Yoke roll" min={-1} max={1} step={0.01} value={s.ctrl.roll} onChange={(v) => up((d) => { d.ctrl.roll = v; })} fmt={(v) => dir(v, "Right", "Left", "Neutral")} />
         <Slider id="ctlYaw" label="Rudder pedals" min={-1} max={1} step={0.01} value={s.ctrl.yaw} onChange={(v) => up((d) => { d.ctrl.yaw = v; })} fmt={(v) => dir(v, "Right", "Left", "Neutral")} />
         <BtnRow><button type="button" className="btn" onClick={() => up((d) => { d.ctrl = { pitch: 0, roll: 0, yaw: 0 }; })}>Center controls</button></BtnRow>
         <Readouts items={[["Pitch trim", E.pitchTrim ? "ESS 2 · ON" : ["NO PWR", "bad"]], ["Roll trim", E.rollTrim ? "ESS 2 · ON" : ["NO PWR", "bad"]], ["Yaw trim", "Ground adj."]]} />
       </Ctl>
-      <H3>Surface details — tap to locate</H3>
+      {s.ctrlFocus !== "all" && (
+        <>
+          <H3>{s.ctrlFocus[0].toUpperCase() + s.ctrlFocus.slice(1)} run · {RUNS[s.ctrlFocus].fig}</H3>
+          <ol className="notes">{RUNS[s.ctrlFocus].steps.map((t) => <li key={t}>{t}</li>)}</ol>
+        </>
+      )}
+      <H3>Mechanisms &amp; surface details — tap to locate</H3>
       <PartsList sys="controls" />
       <H3>Details</H3>
-      <Facts rows={[["Pitch", "Yoke slides in carriage → cable under floor → push-pull tube"], ["Roll", "Yoke rotates → push rods → sector → cable in each wing"], ["Yaw", "Pedals → single cable → push-pull tube"], ["Trim switch", "Conical button on each yoke"], ["Pitch / roll trim", "2 A each, ESS BUS 2"], ["Takeoff trim", "Mark on yoke tube aligns with bolster tab"], ["Trim tabs", "Ground-adjustable on elevator, right aileron, rudder"]]} />
+      <Facts rows={[["Pitch", "Yoke tube → drop link → torque tube & forward sector → cable loop → aft sector pulley → push-pull tube → bellcrank"], ["Roll", "Yoke carriages → push rod → central sector → floor & turning pulleys → wing sectors → conical drive arms; balance cable"], ["Yaw", "Pedals → cable horn → forward & intermediate pulleys → aft sector → push-pull tube → bellcrank"], ["Trim switch", "Conical button on each yoke"], ["Pitch / roll trim", "2 A each, ESS BUS 2"], ["Takeoff trim", "Mark on yoke tube aligns with bolster tab"], ["Trim tabs", "Ground-adjustable on elevator, right aileron, rudder"]]} />
       <H3>Pilot notes</H3>
       <Notes items={["Normal control force easily overrides full trim or autopilot inputs.", "Pitch and roll trim double as backup control if a primary cable fails — as long as the surface isn't jammed.", "There are no gust locks: the trim spring cartridges damp gusts without locking the surfaces."]} />
     </>

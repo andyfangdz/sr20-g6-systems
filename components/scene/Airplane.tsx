@@ -12,6 +12,7 @@ import {
 import { bladeAngle, cabinLit, live } from "@/lib/sim/model";
 import { useSim } from "@/lib/sim/store";
 import { palette, sysColor } from "@/lib/systems";
+import { ControlRig } from "./ControlRig";
 import { Flows } from "./Flows";
 import { Part, Pin, Shell, type PickInfo } from "./Part";
 
@@ -25,7 +26,9 @@ function ControlSurface({ spec }: { spec: SurfaceSpec }) {
   const sys = useSim((x) => x.s.sys);
   const xray = useSim((x) => x.s.xray);
   const theme = useSim((x) => x.theme);
-  const active = sys !== "overview" && spec.sys.includes(sys);
+  const cf = useSim((x) => x.s.ctrlFocus);
+  const chanDim = sys === "controls" && cf !== "all" && !spec.chan?.includes(cf);
+  const active = sys !== "overview" && spec.sys.includes(sys) && !chanDim;
   const color = sysColor(spec.sys[0], theme);
   useFrame(() => {
     const c = useSim.getState().s.ctrl, fl = live.flapAng * D2R;
@@ -245,6 +248,7 @@ export function Airplane({ rootRef, modelRef }: { rootRef: RefObject<THREE.Group
         <Propeller />
         <Cylinders />
         <Yokes />
+        <ControlRig />
         <Tanks />
         <Flows />
         <Displays />

@@ -41,15 +41,18 @@ export function Part({ spec }: { spec: PartSpec }) {
   const focus = useSim((x) => x.s.focus);
   const labels = useSim((x) => x.s.labels);
   const theme = useSim((x) => x.theme);
+  const cf = useSim((x) => x.s.ctrlFocus);
 
   const color = spec.color ?? sysColor(spec.sys[0], theme);
   const all = sys === "overview";
-  const act = all || spec.sys.includes(sys);
+  // Flight-controls channel focus: parts outside the chosen channel fade out
+  const chanDim = sys === "controls" && cf !== "all" && !spec.chan?.includes(cf);
+  const act = (all || spec.sys.includes(sys)) && !chanDim;
   const material = spec.plate ? (act ? plateMat.on : plateMat.dim)
     : focus && focus === spec.name ? mats(color).hi
     : act || !xray ? mats(color).on : mats(color).dim;
   const pick: PickInfo | undefined = spec.name ? { name: spec.name, note: spec.note ?? "", color, sys: spec.sys } : undefined;
-  const showPin = labels && !all && pinSet(sys).has(spec.id);
+  const showPin = labels && !all && !chanDim && pinSet(sys).has(spec.id);
   const phase = useMemo(() => sparkPhase(spec.id), [spec.id]);
 
   useEffect(() => {

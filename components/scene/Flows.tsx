@@ -16,6 +16,8 @@ export function Flows() {
   const sys = useSim((x) => x.s.sys);
   const xray = useSim((x) => x.s.xray);
   const theme = useSim((x) => x.theme);
+  const cf = useSim((x) => x.s.ctrlFocus);
+  const chanDim = (f: (typeof FLOWS)[number], sysNow: string, focus: string) => sysNow === "controls" && focus !== "all" && !f.chan?.includes(focus as never);
 
   const items = useMemo(() => FLOWS.map((f) => {
     const curve = curveOf(f.pts, f.tension ?? 0.3);
@@ -39,7 +41,7 @@ export function Flows() {
     cabinAirColor(s, air.current);
     for (const it of items) {
       const rate = R[it.f.key] ?? 0;
-      const vis = rate !== 0 && (s.sys === "overview" || it.f.sys.includes(s.sys));
+      const vis = rate !== 0 && (s.sys === "overview" || it.f.sys.includes(s.sys)) && !chanDim(it.f, s.sys, s.ctrlFocus);
       it.pts.visible = vis;
       if (!vis) continue;
       const mat = it.pts.material as THREE.PointsMaterial;
@@ -59,7 +61,7 @@ export function Flows() {
     <>
       {items.map((it) => {
         const color = it.f.color ?? sysColor(it.f.sys[0], theme);
-        const act = sys === "overview" || it.f.sys.includes(sys);
+        const act = (sys === "overview" || it.f.sys.includes(sys)) && !chanDim(it.f, sys, cf);
         const pick: PickInfo | undefined = it.f.name ? { name: it.f.name, note: it.f.note ?? "", color, sys: it.f.sys } : undefined;
         return (
           <group key={it.f.key}>

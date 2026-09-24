@@ -9,7 +9,9 @@ import {
   loft, pantGeo, planeRing, sC, sLE, sectionSlab, sph, stabSec, topY, tubeGeo, wC, wLE, wT, wY, wingP, wingSec, fRing,
 } from "./geometry";
 import { V, type Vec3 } from "./math";
+import { AIL_DRIVE, AIL_SECTOR, CARR, ELEV_HORN, ETT, LEVER_ANG, PEDAL_TT, PULLEYS, RUD_HORN, RUD_HORN_AFT, alongCable, pulleyGeo, sectorGeo } from "./rig";
 import type { SysId } from "./systems";
+import type { Chan } from "./sim/model";
 
 export type Anim = "plug" | "magR" | "magL" | "alt1" | "alt2" | "brakeR" | "brakeL" | "selPtr" | "altDoor" | "suction";
 
@@ -30,10 +32,13 @@ export interface PartSpec {
   anim?: Anim;
   mag?: "R" | "L";
   plate?: boolean;
+  /** Flight-control channel(s) this part belongs to (for the channel focus view). */
+  chan?: Chan[];
 }
 
 export interface ShellSpec { id: string; geo: () => THREE.BufferGeometry; name: string; note: string; skin?: boolean }
-export interface SurfaceSpec { key: string; geo: () => THREE.BufferGeometry; pivot: Vec3; axis: Vec3; sys: SysId[]; name: string; note: string }
+export interface SurfaceSpec { key: string; geo: () => THREE.BufferGeometry; pivot: Vec3; axis: Vec3; sys: SysId[]; name: string; note: string; chan?: Chan[] }
+export const chanOfKey = (k: string): Chan[] | undefined => (k.startsWith("elev") || k.startsWith("el") ? ["elevator"] : k.startsWith("ail") ? ["aileron"] : k.startsWith("rud") ? ["rudder"] : undefined);
 
 const P = (v: THREE.Vector3): Vec3 => [v.x, v.y, v.z];
 let n = 0;
@@ -72,7 +77,7 @@ shell(() => loft(finHs.map((h) => finSec(h, 0, finCut(h)))), "Vertical stabilize
 /* ---------- control surfaces (pivot on their hinge lines) ---------- */
 function surface(key: string, secs: () => THREE.Vector3[][], a: THREE.Vector3, b: THREE.Vector3, sys: SysId[], name: string, note: string) {
   SURFACES.push({
-    key, pivot: P(a), axis: P(b.clone().sub(a).normalize()), sys, name, note,
+    key, pivot: P(a), axis: P(b.clone().sub(a).normalize()), sys, name, note, chan: chanOfKey(key),
     geo: () => { const g = loft(secs()); g.translate(-a.x, -a.y, -a.z); return g; },
   });
 }
@@ -96,7 +101,7 @@ export const surfacePivot = (key: string) => SURFACES.find((s) => s.key === key)
 /** Part attached to a moving control surface; `world` is converted to hinge-relative coords. */
 function onSurf(key: string, world: THREE.Vector3, geo: () => THREE.BufferGeometry, o: Omit<PartSpec, "id" | "geo" | "sys"> & { sys?: SysId[] }) {
   const pv = surfacePivot(key);
-  part(geo, o.sys || ["controls"], { ...o, parent: "surf:" + key, pos: [world.x - pv[0], world.y - pv[1], world.z - pv[2]] });
+  part(geo, o.sys || ["controls"], { chan: chanOfKey(key), ...o, parent: "surf:" + key, pos: [world.x - pv[0], world.y - pv[1], world.z - pv[2]] });
 }
 
 /* ---------- control-surface details (Costanzo deck photos) ---------- */
@@ -116,7 +121,7 @@ const wickNote = "Static wick: bleeds static charge off the trailing edge to cut
     [3.95, "Aileron hinge fairing", "One of two hinges per aileron.", ["controls"]],
     [4.85, "Aileron hinge fairing", "One of two hinges per aileron.", ["controls"]],
   ] as [number, string, string, SysId[]][]).forEach(([z, name, note, sys], i) =>
-    part(() => box(0.34, 0.05, 0.025), sys, { pos: P(wingP(s * z, 0.74, -1).add(V(-0.02, -0.02, 0))), color: "#C9D0D5", name, note, ext: true, pin: s > 0 && i === 0 }));
+    part(() => box(0.34, 0.05, 0.025), sys, { pos: P(wingP(s * z, 0.74, -1).add(V(-0.02, -0.02, 0))), color: "#C9D0D5", name, note, ext: true, pin: s > 0 && i === 0, chan: sys[0] === "controls" ? ["aileron"] : undefined }));
 });
 onSurf("ailR", wingP(4.3, 0.99, 0).add(V(-0.03, 0, 0)), () => box(0.07, 0.004, 0.12), { color: "#8C99A3", name: "Aileron trim tab (ground-adjustable)", note: "Right aileron only. Factory-set; bent on the ground to trim out a wing-heavy tendency.", ext: true, pin: true });
 onSurf("elevR", V(sLE(0.5) - sC(0.5) - 0.03, SY, 0.5), () => box(0.07, 0.004, 0.14), { color: "#8C99A3", name: "Elevator trim tab (ground-adjustable)", note: "Factory-set tab for small neutral-trim corrections. (Costanzo deck)", ext: true, pin: true });
@@ -154,8 +159,11 @@ part(() => tubeGeo([[0, 0, 0], [0.09, -0.34, 0], [0.22, -0.66, 0]], 0.035), ["ge
 part(() => cyl(0.17, 0.11, "z", 24), ["gear"], { parent: "caster", pos: [0.02, 0, 0], color: "#2A2F33", name: "Nose wheel", note: "5.00 × 5 tire. Free-castering ±85°; steer with differential braking.", ext: true });
 part(() => pantGeo(0.7, 0.17), ["gear"], { parent: "caster", pos: [0.02, 0.02, 0], scale: [1, 1, 0.55], name: "Nose wheel pant", note: "", ext: true });
 part(() => box(0.1, 0.08, 0.3), ["gear"], { pos: [2.22, -0.4, -0.26], name: "PARK BRAKE handle", note: "Right side kick plate by the pilot's right knee. Set toe brakes, then pull aft. Never set in flight.", pin: true });
-[-0.36, -0.14, 0.14, 0.36].forEach((z) =>
-  part(() => box(0.04, 0.18, 0.09), ["gear", "controls"], { pos: [2.42, -0.52, z], rot: [0, 0, 0.35], name: "Rudder pedal / toe brake", note: "Top half is the toe brake. Either pilot's left or right toe brake applies that side's brake." }));
+[-0.36, -0.14, 0.14, 0.36].forEach((z) => {
+  const parent = z < 0 ? "rig:pedL" : "rig:pedR";
+  part(() => box(0.04, 0.18, 0.09), ["gear", "controls"], { chan: ["rudder"], parent, pos: [2.42, -0.52, z], rot: [0, 0, 0.35], name: "Rudder pedal / toe brake", note: "Top half is the toe brake. Either pilot's left or right toe brake applies that side's brake. Pushing a pedal forward pulls its rudder cable (POH Fig. 7-3)." });
+  part(() => cyl(0.018, 0.1), ["gear"], { parent, pos: [2.45, -0.58, z], color: "#8C959C", name: "Brake master cylinder", note: "One per pedal. Pressing the toe brake pressurizes that side's brake line." });
+});
 
 /* ---------- propeller (74 in., 3 blade) ---------- */
 export const PROP: Vec3 = [3.8, -0.14, 0];
@@ -224,13 +232,13 @@ part(() => box(0.4, 0.18, 0.02), ["electrical"], { pos: [1.78, -0.4, -0.14], col
 export const YOKES = [{ side: "L", z: -0.46 }, { side: "R", z: 0.46 }];
 export const YOKE_X = 2.02, YOKE_Y = -0.06;
 YOKES.forEach(({ side }) => {
-  part(() => cyl(0.018, 0.3, "x"), ["controls"], { parent: "yoke:" + side, pos: [0.17, 0, 0], color: "#555E66", name: "Yoke tube", note: "Slides fore/aft in a bearing carriage for pitch; rotates for roll." });
-  part(() => box(0.05, 0.14, 0.045), ["controls"], { parent: "grip:" + side, color: "#20262B", name: "Side yoke", note: "Conical trim button on top: fore/aft = pitch trim, left/right = roll trim. PTT switch for COM." });
-  part(() => box(0.045, 0.045, 0.17), ["controls"], { parent: "grip:" + side, pos: [0, 0.05, 0], color: "#20262B" });
+  part(() => cyl(0.018, 0.5, "x"), ["controls"], { parent: "yoke:" + side, chan: ["elevator", "aileron"], pos: [0.27, 0, 0], color: "#555E66", name: "Yoke tube", note: "Slides fore/aft in its bearing carriage for pitch (driving the elevator drop link) and rotates the carriage for roll." });
+  part(() => box(0.05, 0.14, 0.045), ["controls"], { parent: "grip:" + side, chan: ["elevator", "aileron"], color: "#20262B", name: "Side yoke", note: "Conical trim button on top: fore/aft = pitch trim, left/right = roll trim. PTT switch for COM." });
+  part(() => box(0.045, 0.045, 0.17), ["controls"], { parent: "grip:" + side, chan: ["elevator", "aileron"], pos: [0, 0.05, 0], color: "#20262B" });
 });
-part(() => box(0.08, 0.06, 0.06), ["controls"], { pos: [-2.5, 0, 0], color: "#9F85E6", name: "Pitch trim cartridge", note: "Electric motor shifts the spring cartridge's neutral point. 2 A PITCH TRIM breaker, ESS BUS 2." });
-part(() => box(0.08, 0.05, 0.06), ["controls"], { pos: P(wingP(-1.3, 0.62, 0)), color: "#9F85E6", name: "Roll trim cartridge", note: "Spring cartridge at the left actuation pulley. Autopilot also uses it. 2 A ROLL TRIM, ESS BUS 2." });
-part(() => box(0.08, 0.05, 0.08), ["controls"], { pos: [2.38, -0.6, 0], color: "#9F85E6", name: "Yaw trim spring cartridge", note: "Centering spring on the pedal torque tube. Ground-adjustable only." });
+part(() => box(0.08, 0.05, 0.05), ["controls"], { pos: [-2.66, 0.05, 0.04], color: "#9F85E6", chan: ["elevator"], name: "Pitch trim cartridge", note: "Electric motor shifts the spring cartridge's neutral point. 2 A PITCH TRIM breaker, ESS BUS 2." });
+part(() => box(0.08, 0.04, 0.06), ["controls"], { pos: P(wingP(-3.4, 0.66, 0)), color: "#9F85E6", chan: ["aileron"], name: "Roll trim cartridge", note: "Spring cartridge at the left actuation pulley. Autopilot also uses it. 2 A ROLL TRIM, ESS BUS 2." });
+part(() => box(0.08, 0.04, 0.06), ["controls"], { pos: [PEDAL_TT.x - 0.05, PEDAL_TT.y, -0.22], color: "#9F85E6", chan: ["rudder"], name: "Yaw trim spring cartridge", note: "Centering spring on the pedal torque tube. Ground-adjustable only." });
 export const FT = { x: 0.66, y: -0.54 };
 part(() => cyl(0.02, 1.9, "z"), ["flaps"], { pos: [FT.x, FT.y, 0], color: "#9F85E6", name: "Flap torque tube", note: "Mechanically ties both flaps to one actuator." });
 part(() => box(0.24, 0.07, 0.09), ["flaps"], { pos: [FT.x + 0.02, FT.y + 0.02, 0], color: "#7C57CF", name: "Flap actuator", note: "Motorized linear actuator; proximity switches stop travel and drive the position lights. 10 A FLAPS, NON ESS BUS.", pin: true });
@@ -240,7 +248,7 @@ part(() => box(0.09, 0.02, 0.02), ["fuel"], { pos: [1.24, -0.23, 0], color: "#F2
 part(() => box(0.04, 0.03, 0.04), ["fuel"], { pos: [1.34, -0.26, 0.08], name: "BOOST PUMP switch", note: "Next to the selector. On for takeoff, climb, maneuvering, landing and tank switching." });
 part(() => new THREE.CylinderGeometry(0.012, 0.012, 0.1, 8), ["caps", "cabin"], { pos: [1.3, 0.63, -0.02], color: "#D32640", name: "CAPS activation T-handle", note: "Ceiling, centerline, above the pilot's right shoulder. Pull ~2 in. of slack, then pull straight down (up to 45 lb).", pin: true });
 part(() => box(0.03, 0.02, 0.15), ["caps", "cabin"], { pos: [1.3, 0.58, -0.02], color: "#D32640" });
-part(() => cyl(0.04, 0.24), ["cabin"], { pos: [2.3, -0.36, -0.45], color: "#D32640", name: "Fire extinguisher", note: "Halon 1211, class B & C. Forward outboard in the pilot footwell. About 2.5 lb; check gauge/pin preflight.", pin: true });
+part(() => cyl(0.04, 0.24), ["cabin"], { pos: [2.18, -0.45, -0.5], color: "#D32640", name: "Fire extinguisher", note: "Halon 1211, class B & C. Forward outboard in the pilot footwell. About 2.5 lb; check gauge/pin preflight.", pin: true });
 part(() => box(0.22, 0.05, 0.12), ["cabin"], { pos: [1.45, -0.24, 0], color: "#8A6A3A", name: "Armrest: egress hammer & hour meters", note: "8 oz ball-peen hammer for breaking the acrylic windows. HOBBS runs with BAT 1 + either ALT on; FLIGHT starts ~35 KIAS.", pin: true });
 part(() => box(0.16, 0.09, 0.11), ["cabin", "caps"], { pos: [-0.8, -0.28, 0.13], color: "#EB7A12", name: "ELT — Artex ELT 1000", note: "406 MHz + 121.5 MHz. Triggers at 4–5 ft/s longitudinal Δv or on CAPS deployment. Removable for portable use.", pin: true });
 part(() => box(0.05, 0.04, 0.02), ["cabin"], { pos: [1.92, -0.44, -0.14], color: "#EB7A12", name: "ELT remote switch (RCPI)", note: "ON – ARM/OFF – TEST, red LED flashes when transmitting. Below the ALT AIR knob by the pilot's right knee." });
@@ -327,6 +335,59 @@ export const LIGHTS = {
   part(() => sph(0.022), ["lighting"], { pos, color: "#E8C46A", name, note: "Convenience lighting, 5 A CONV LIGHTS breaker on the CONV bus (BAT 1 direct).", pin: true, ext }));
 ([[LIGHTS.tipL, "Left nav/strobe (red)"], [LIGHTS.tipR, "Right nav/strobe (green)"], [LIGHTS.tail, "Tail position light"]] as [Vec3, string][]).forEach(([pos, name]) =>
   part(() => sph(0.035), ["lighting"], { pos, color: "#D9D9D9", name, note: "Exterior lighting is described in the Spectra wing tip light supplement (11934-S56). NAV and STROBE breakers on NON ESS BUS.", pin: true, ext: true }));
+
+
+/* ---------- flight-control mechanisms (POH Figures 7-1, 7-2, 7-3) ---------- */
+const CTL = "#7C57CF", STEEL = "#8C959C";
+// elevator: lateral torque tube under the panel with end levers and the forward cable sector
+part(() => cyl(0.016, ETT.half * 2, "z"), ["controls"], { chan: ["elevator"], parent: "rig:ett", color: STEEL, name: "Elevator torque tube", note: "Lateral torque tube under the panel. Drop links from both yoke tubes rotate it; its forward sector drives the elevator cables (POH Fig. 7-1).", pin: true });
+[-1, 1].forEach((sd) => part(() => box(0.02, ETT.lever, 0.02), ["controls"], { chan: ["elevator"], parent: "rig:ett", pos: [Math.sin(LEVER_ANG) * ETT.lever / 2, Math.cos(LEVER_ANG) * ETT.lever / 2, sd * CARR.z], rot: [0, 0, -LEVER_ANG], color: STEEL, name: "Torque tube lever", note: "Lever arm at each end of the elevator torque tube; the yoke drop link attaches to its tip." }));
+part(() => sectorGeo(ETT.sectorR), ["controls"], { chan: ["elevator"], parent: "rig:ett", pos: [0, 0, ETT.sectorZ], color: CTL, name: "Forward elevator sector", note: "Cable sector on the torque tube. The two elevator cables leave it as a crossed pair to the forward pulleys.", pin: true });
+part(() => cyl(0.02, 0.05, "z"), ["controls"], { chan: ["elevator"], pos: [ETT.c[0], ETT.c[1], -0.25], color: "#5A636A", name: "Torque tube bearing block", note: "Bearing blocks support the elevator torque tube." });
+part(() => cyl(0.02, 0.05, "z"), ["controls"], { chan: ["elevator"], pos: [ETT.c[0], ETT.c[1], 0.25], color: "#5A636A" });
+// aileron: pivoting bearing carriages, central pulley sector
+[-1, 1].forEach((sd) => {
+  const parent = "rig:carr:" + (sd < 0 ? "L" : "R");
+  part(() => box(0.2, 0.02, 0.05), ["controls"], { chan: ["aileron"], parent, pos: [0, -0.03, 0], color: STEEL, name: "Aileron bearing carriage", note: "The yoke tube rotates this pivoting carriage for roll and slides through it for pitch (POH Fig. 7-2).", pin: sd > 0 });
+  part(() => box(0.02, CARR.arm, 0.02), ["controls"], { chan: ["aileron"], parent, pos: [CARR.armX, -CARR.arm / 2, 0], color: STEEL, name: "Carriage arm", note: "Drives the lateral push rod to the central aileron sector." });
+});
+part(() => { const g = new THREE.CylinderGeometry(AIL_SECTOR.r, AIL_SECTOR.r, 0.014, 32); g.rotateZ(Math.PI / 2); return g; }, ["controls"], { chan: ["aileron"], parent: "rig:ailSector", color: CTL, name: "Central aileron pulley sector", note: "Centrally located pulley sector: the push rod turns it and it drives both aileron cables down to the floor pulleys.", pin: true });
+part(() => box(0.012, 0.02, 0.012), ["controls"], { chan: ["aileron"], parent: "rig:ailSector", pos: [0, AIL_SECTOR.r, 0], color: STEEL });
+// rudder: pedal torque tube and cable horn
+part(() => cyl(0.014, PEDAL_TT.half * 2, "z"), ["controls", "gear"], { chan: ["rudder"], pos: [PEDAL_TT.x, PEDAL_TT.y, 0], color: STEEL, name: "Rudder pedal torque tube", note: "Carries the four pedals; springs and a ground-adjustable spring cartridge here centre the rudder." , pin: true });
+part(() => box(0.03, 0.02, RUD_HORN.half * 2 + 0.02), ["controls"], { chan: ["rudder"], parent: "rig:rudHorn", color: CTL, name: "Rudder cable horn", note: "Pedal links pivot this horn; its ends pull the two rudder cable strands.", pin: true });
+part(() => cyl(0.008, 0.05, "y"), ["controls"], { chan: ["rudder"], pos: RUD_HORN.c, color: STEEL });
+// arm from each pedal pair's inboard pedal across to its pedal link
+[-1, 1].forEach((sd) => {
+  const z0 = sd * 0.14, z1 = RUD_HORN.c[2] + sd * RUD_HORN.half;
+  part(() => box(0.02, 0.015, Math.abs(z1 - z0) + 0.02), ["controls"], { chan: ["rudder"], parent: sd < 0 ? "rig:pedL" : "rig:pedR", pos: [PEDAL_TT.x, RUD_HORN.c[1], (z0 + z1) / 2], color: STEEL, name: "Pedal arm", note: "Ties each pedal pair to its pedal link; pushing a pedal forward pulls the horn." });
+});
+// pulleys (each in its own group so it can turn with cable travel)
+Object.entries(PULLEYS).forEach(([k, d]) =>
+  part(() => pulleyGeo(d.r, d.axis, d.double, d.gap), ["controls"], { chan: chanOfKey(k === "ef" || k === "em" || k === "ea" ? "el" : k.startsWith("a") ? "ail" : "rud"), parent: "rig:pul:" + k, color: k === "ea" || k === "ra" || k.startsWith("aw") ? CTL : "#A6AEB4", name: d.name, note: d.note, pin: true }));
+// crank pins on the aft sectors
+part(() => cyl(0.008, 0.03, "z"), ["controls"], { chan: ["elevator"], parent: "rig:pul:ea", pos: [0, -0.06, 0], color: STEEL });
+part(() => cyl(0.008, 0.03, "y"), ["controls"], { chan: ["rudder"], parent: "rig:pul:ra", pos: [0, 0, 0.05], color: STEEL });
+// bellcranks on the surfaces
+{
+  const pv = surfacePivot("elevR"), c = ELEV_HORN.c;
+  part(() => box(0.02, ELEV_HORN.arm, 0.02), ["controls"], { parent: "surf:elevR", pos: [c[0] - pv[0], c[1] - ELEV_HORN.arm / 2 - pv[1], c[2] - pv[2]], color: CTL, name: "Elevator bellcrank", note: "Between the elevator halves; the push-pull tube from the aft sector pulley drives it.", pin: true });
+  part(() => cyl(0.014, 0.2, "z"), ["controls"], { parent: "surf:elevR", pos: [c[0] - pv[0], c[1] - pv[1], c[2] - pv[2]], color: STEEL, name: "Elevator torque tube (tail)", note: "Joins the two elevator halves on the hinge line." });
+  const rv = surfacePivot("rudder"), r = RUD_HORN_AFT.c;
+  part(() => box(0.02, 0.02, RUD_HORN_AFT.arm), ["controls"], { parent: "surf:rudder", pos: [r[0] - rv[0], r[1] - rv[1], RUD_HORN_AFT.arm / 2 - rv[2]], color: CTL, name: "Rudder bellcrank", note: "Horn at the bottom of the rudder; the push-pull tube from the aft rudder sector drives it.", pin: true });
+  [1, -1].forEach((sd) => {
+    const key = "ail" + (sd > 0 ? "R" : "L"), av = surfacePivot(key);
+    const hz = wingP(sd * AIL_DRIVE.z, 0.75, 0);
+    part(() => box(0.012, AIL_DRIVE.arm, 0.012), ["controls"], { chan: ["aileron"], parent: "surf:" + key, pos: [hz.x - av[0], hz.y + AIL_DRIVE.arm / 2 - av[1], hz.z - av[2]], color: CTL, name: "Aileron conical drive arm", note: "Right-angle drive: the arm on the aileron hinge that the wing sector's crank turns." });
+    part(() => box(0.012, 0.012, AIL_DRIVE.crank), ["controls"], { chan: ["aileron"], parent: "rig:pul:aw" + (sd > 0 ? "R" : "L"), pos: [0, AIL_DRIVE.lift, sd * AIL_DRIVE.crank / 2], color: STEEL, name: "Wing sector crank arm", note: "Swings fore-aft as the sector turns and drives the aileron's conical drive arm." });
+  });
+}
+// turnbuckles and cable guides
+([["elA", 3, 0.25], ["elB", 4, 0.25], ["elA", 3, 0.35], ["elB", 4, 0.35], ["rudR", 2, 0.3], ["rudL", 2, 0.3]] as [string, number, number][]).forEach(([k, i, t], j) =>
+  part(() => cyl(0.009, 0.07, "x"), ["controls"], { chan: chanOfKey(k), pos: alongCable(k, i, t), color: "#C9B98F", name: "Turnbuckle", note: "Sets cable tension; safety-wired after rigging.", pin: j === 0 }));
+[1, -1].forEach((sd) => [["ailBal", sd > 0 ? 1 : 6], ["ail" + (sd > 0 ? "R" : "L"), 7]].forEach(([k, i]) =>
+  part(() => box(0.03, 0.03, 0.02), ["controls"], { chan: ["aileron"], pos: alongCable(k as string, i as number, 0.5), color: "#C9D0D5", name: "Cable guide", note: "Fairlead that keeps the aileron cable centred as it runs spanwise (the clips drawn in POH Fig. 7-2).", pin: sd > 0 && k === "ailBal" }))
+);
 
 /* ---------- lookups ---------- */
 export const partsFor = (parent?: string) => PARTS.filter((p) => p.parent === parent);
