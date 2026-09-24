@@ -52,7 +52,6 @@ lib/
   sim/model.ts        Sim state, electrical solver, CAS logic, bus table (pure functions)
   sim/store.ts        zustand store (discrete state + derived electrical solution)
   sim/tick.ts         Per-frame engine / flap motor / CAPS clock
-legacy/standalone.html  The original single-file (vanilla three.js) version
 ```
 
 ### State model
