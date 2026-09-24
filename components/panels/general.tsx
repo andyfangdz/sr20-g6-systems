@@ -63,7 +63,7 @@ export function Lighting() {
   const flip = (k: "nav" | "strobe" | "land" | "ice") => up((d) => { d.lights[k] = !d.lights[k]; });
   return (
     <>
-      <p className="lead">Exterior lighting is all LED: each wingtip carries a position light, a strobe, a white aft position light and a leading-edge landing/recognition light, so there is no tail light. A landing light sits in the lower cowl and ice inspection lights shine on the wing leading edges. Inside, convenience lighting (dome, baggage, footwell, entry-step) runs straight from BAT 1 through the CONV bus.</p>
+      <p className="lead">Exterior lighting is all LED: each wingtip carries a position light, a strobe, a white aft position light and a leading-edge landing light, so there is no tail light and no cowl landing light. Ice inspection lights shine on the wing leading edges. Inside, convenience lighting (dome, baggage, footwell, entry-step) runs straight from BAT 1 through the CONV bus.</p>
       <H3>Exterior light switches</H3>
       <Ctl>
         <div className="switches">
@@ -72,7 +72,7 @@ export function Lighting() {
           <Rocker label="LAND" on={L.land} onToggle={() => flip("land")} />
           <Rocker label="ICE" on={L.ice} onToggle={() => flip("ice")} />
         </div>
-        <Readouts items={[["Nav + aft position", ext(L.nav, x.nav)], ["Strobes", ext(L.strobe, x.strobe)], ["Landing + wingtip", ext(L.land, x.land)], ["Ice inspection", ext(L.ice, x.ice)]]} />
+        <Readouts items={[["Nav + aft position", ext(L.nav, x.nav)], ["Strobes", ext(L.strobe, x.strobe)], ["Wingtip landing", ext(L.land, x.land)], ["Ice inspection", ext(L.ice, x.ice)]]} />
       </Ctl>
       <Small>Exterior glows show in the Overview and Lighting views. Pull a breaker on the NON ESS BUS, or lose Main Dist Bus 2, to see a light drop out.</Small>
       <H3>Lights — tap to locate</H3>
@@ -89,7 +89,7 @@ export function Lighting() {
       <H3>Instrument dimmer</H3>
       <Notes items={["Full counter-clockwise is OFF = daytime mode: keypads, bolster and standby unlit; PFD/MFD brightness on photocell (full bright).", "Turning it on dims the displays to night levels and lights the keys, switches and standby bezels.", "PANEL knob controls red LED floods under the glareshield and dims the front reading lights."]} />
       <H3>Notes</H3>
-      <Notes items={["There is no tail light: the rearward white position light is built into each wingtip trailing edge and comes on with NAV.", "LAND lights the lower-cowl landing light and both wingtip landing/recognition lights together.", "Ice inspection lights are for checking the leading edges at night. Many pilots use them only for quick checks because they cost night vision."]} />
+      <Notes items={["There is no tail light: the rearward white position light is built into each wingtip trailing edge and comes on with NAV.", "LAND lights both wingtip landing lights together. There is no landing light in the cowl.", "Ice inspection lights are for checking the leading edges at night. Many pilots use them only for quick checks because they cost night vision."]} />
       <H3>Power</H3>
       <Facts rows={[["Instrument/panel/reading/dome", "5 A CABIN LIGHTS, MAIN BUS 1"], ["Convenience lights", "5 A CONV LIGHTS, CONV bus"], ["Nav / strobe", "NON ESS BUS"], ["Landing / ice inspection", "NON ESS BUS (model; check your breaker panel)"], ["Exterior detail", "Spectra wing tip light supplement"]]} />
     </>

@@ -172,7 +172,8 @@ function beamProps(from: THREE.Vector3Tuple, to: THREE.Vector3Tuple, r: number) 
   const quat = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), d.normalize());
   return { geo, pos: a.clone().add(b).multiplyScalar(0.5), quat };
 }
-const LAND_AIM: THREE.Vector3Tuple = [6.6, -0.95, 0];
+/** Wingtip landing lights shine forward and a little down. */
+const landAim = (p: THREE.Vector3Tuple): THREE.Vector3Tuple => [p[0] + 2.8, p[1] - 0.45, p[2]];
 
 function LightFX() {
   const refs = useRef<Record<string, THREE.Object3D | null>>({});
@@ -183,7 +184,8 @@ function LightFX() {
     </sprite>
   );
   const beams = useMemo(() => ({
-    land: beamProps(LIGHTS.land, LAND_AIM, 0.55),
+    landL: beamProps(LIGHTS.landL, landAim(LIGHTS.landL), 0.45),
+    landR: beamProps(LIGHTS.landR, landAim(LIGHTS.landR), 0.45),
     iceL: beamProps(LIGHTS.iceL, LIGHTS.iceAimL, 0.16),
     iceR: beamProps(LIGHTS.iceR, LIGHTS.iceAimR, 0.16),
   }), []);
@@ -198,7 +200,7 @@ function LightFX() {
     const ext = s.sys === "overview" || s.sys === "lighting", x = extLit(s, E), strobe = clock.elapsedTime % 1.2 < 0.06;
     show(["navL", "navR", "aftL", "aftR"], ext && x.nav);
     show(["strL", "strR"], ext && x.strobe && strobe);
-    show(["land", "landBeam", "recL", "recR"], ext && x.land);
+    show(["landL", "landR", "landLBeam", "landRBeam"], ext && x.land);
     show(["iceL", "iceR", "iceLBeam", "iceRBeam"], ext && x.ice);
     const cl = cabinLit(s, E), cab = s.sys === "lighting";
     show(["dome"], cab && cl.dome);
@@ -211,8 +213,8 @@ function LightFX() {
       {glow("navL", LIGHTS.tipL, "#FF2A2A", 0.3)}{glow("navR", LIGHTS.tipR, "#22FF66", 0.3)}
       {glow("aftL", LIGHTS.aftL, "#FFFFFF", 0.22)}{glow("aftR", LIGHTS.aftR, "#FFFFFF", 0.22)}
       {glow("strL", LIGHTS.tipL, "#FFFFFF", 0.8)}{glow("strR", LIGHTS.tipR, "#FFFFFF", 0.8)}
-      {glow("land", LIGHTS.land, "#FFF6DD", 0.5)}{beam("land", 0.1)}
-      {glow("recL", LIGHTS.recL, "#FFF6DD", 0.4)}{glow("recR", LIGHTS.recR, "#FFF6DD", 0.4)}
+      {glow("landL", LIGHTS.landL, "#FFF6DD", 0.45)}{glow("landR", LIGHTS.landR, "#FFF6DD", 0.45)}
+      {beam("landL", 0.1)}{beam("landR", 0.1)}
       {glow("iceL", LIGHTS.iceL, "#FFF6DD", 0.25)}{glow("iceR", LIGHTS.iceR, "#FFF6DD", 0.25)}
       {beam("iceL", 0.12)}{beam("iceR", 0.12)}
       {glow("dome", LIGHTS.dome, "#FFE7B0", 0.6)}{glow("bag", LIGHTS.bag, "#FFE7B0", 0.5)}

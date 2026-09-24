@@ -326,12 +326,10 @@ part(() => tubeGeo([[-0.62, 0.24, 0], [AB, 0.2, 0]], 0.014), ["caps"], { name: "
 const tipAt = (s: number): Vec3 => [wLE(5.84) - 0.5 * wC(5.84), wY(5.84), s * 5.85];
 const iceAt = (s: number) => onSkin(2.02, -0.34, s);
 export const LIGHTS = {
-  // wingtip assemblies: forward nav + strobe, aft-facing white position light, leading-edge landing/recognition light
+  // wingtip assemblies: forward nav + strobe, aft-facing white position light, leading-edge landing light
   tipL: tipAt(-1), tipR: tipAt(1),
   aftL: P(wingP(-5.8, 0.93, 0).add(V(-0.02, 0, -0.01))), aftR: P(wingP(5.8, 0.93, 0).add(V(-0.02, 0, 0.01))),
-  recL: P(wingP(-5.5, 0, 0).add(V(0.01, 0, 0))), recR: P(wingP(5.5, 0, 0).add(V(0.01, 0, 0))),
-  /** Lower-cowl landing light, under the spinner. */
-  land: [3.7, -0.34, 0] as Vec3,
+  landL: P(wingP(-5.5, 0, 0).add(V(0.01, 0, 0))), landR: P(wingP(5.5, 0, 0).add(V(0.01, 0, 0))),
   /** Ice inspection lights on the fuselage sides, aimed at each wing leading edge. */
   iceL: P(iceAt(-1)), iceR: P(iceAt(1)),
   iceAimL: P(wingP(-2.4, 0.02, 1)), iceAimR: P(wingP(2.4, 0.02, 1)),
@@ -347,9 +345,8 @@ const EXT = "#D9D9D9";
   part(() => sph(0.035), ["lighting"], { pos, color: EXT, name, note: "LED position light and anti-collision strobe in one wingtip assembly. NAV and STROBE switches on the bolster; breakers on NON ESS BUS.", pin: true, ext: true }));
 [LIGHTS.aftL, LIGHTS.aftR].forEach((pos, i) =>
   part(() => sph(0.025), ["lighting"], { pos, color: EXT, name: "Aft position light (white)", note: "White rear-facing position light in the wingtip trailing edge, on the NAV switch. It does the tail light's job: there is no light on the rudder or tailcone.", pin: i === 0, ext: true }));
-[LIGHTS.recL, LIGHTS.recR].forEach((pos, i) =>
-  part(() => box(0.03, 0.035, 0.14), ["lighting"], { pos, color: EXT, name: "Wingtip landing / recognition light", note: "LED lamp behind the clear lens in the wingtip leading edge. Comes on with the landing light (LAND switch) to make the airplane easier to see head-on.", pin: i === 1, ext: true }));
-part(() => box(0.03, 0.06, 0.12), ["lighting"], { pos: LIGHTS.land, color: EXT, name: "Landing light (lower cowl)", note: "LED landing light in the lower cowl, below the spinner. LAND switch on the bolster; breaker on NON ESS BUS in this model.", pin: true, ext: true });
+[LIGHTS.landL, LIGHTS.landR].forEach((pos, i) =>
+  part(() => box(0.03, 0.035, 0.14), ["lighting"], { pos, color: EXT, name: "Wingtip landing light", note: "LED landing light behind the clear lens in the wingtip leading edge, one per side. The G6 has no cowl landing light: both are on the LAND switch. Breaker on NON ESS BUS in this model.", pin: i === 1, ext: true }));
 [LIGHTS.iceL, LIGHTS.iceR].forEach((pos, i) =>
   part(() => cyl(0.022, 0.02, "z"), ["lighting"], { pos, color: EXT, name: "Ice inspection light", note: "Fuselage-side light aimed at the wing leading edge so you can check for ice at night. ICE switch on the bolster. Position on the model is approximate.", pin: i === 1, ext: true }));
 
